@@ -289,6 +289,19 @@ def parse_invoice(saved_path, exported, exported_path):
     return field_results
 
 
+def get_by_filenam(filename):
+    import requests
+
+    headers = {
+        'Accept': 'application/json',
+    }
+
+    response = requests.get(
+        'http://35.226.165.155:3000/api/Document/'+filename,
+        headers=headers)
+    return json.loads(response.content)
+
+
 @app.route('/<filename>/save', methods=['POST'])
 def save_file(filename):
     file_name = filename
@@ -407,6 +420,11 @@ def stamp_pdf(filename):
 @app.route('/<filename>/signature', methods=['POST'])
 def request_signature(filename):
     try:
+        datas = get_by_filenam(filename)
+        user = decrypt_data(request.form['token'].encode('utf-8'))
+
+        user = json.loads(user)
+
         saved_path = stamp_pdf(filename)
         privkey = rsa.PrivateKey.load_pkcs1(file_open('privatekey.key'))
 
@@ -422,6 +440,18 @@ def request_signature(filename):
 
         s = open(signature_file, 'wb')
         s.write(signature)
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        }
+
+        datass = {"$class": "org.example.Document", "fileName": filename, "fileChecksum": datas['fileChecksum'],
+                  "fileData": datas['fileData'],
+                  "signatureFile": sign_name, "owner": 'resource:org.example.User#' + user['email']}
+
+        response = requests.put('http://35.226.165.155:3000/api/Document/' + filename, headers=headers,
+                                data=json.dumps(datass))
+        print(response.content)
         resp = jsonify({'message': 'Signature created successfully', 'success': True, 'data': None})
         resp.status_code = 200
         return resp
@@ -430,6 +460,14 @@ def request_signature(filename):
         resp.status_code = 400
         return resp
 
+
+@app.route('/<filename>/info')
+def get_data_by_filename(filename):
+    data = get_by_filenam(filename)
+
+    resp = jsonify({'message': 'Data retrieved', 'success': True, 'data': data})
+    resp.status_code = 200
+    return resp
 
 
 @app.route('/<filename>/generate/signature')
@@ -454,8 +492,6 @@ def generate_original(filename):
 
 @app.route('/<filename>/verify', methods=['POST'])
 def verify_signature(filename):
-
-
     if 'file' not in request.files:
         resp = jsonify({'message': 'No file part in the request'})
         resp.status_code = 400
@@ -465,7 +501,7 @@ def verify_signature(filename):
         resp = jsonify({'message': 'No file selected for uploading'})
         resp.status_code = 400
         return resp
-    sign_file = filename+'-signature'
+    sign_file = filename + '-signature'
     sign_file_path = os.path.join(app.config['SIGN_FOLDER'], sign_file)
 
     # Open public key file and load in key
