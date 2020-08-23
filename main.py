@@ -306,6 +306,7 @@ def get_by_filenam(filename):
 def save_file(filename):
     file_name = filename
     file_data = request.form['document_data']
+    file_title = request.form['file_title']
     # file_title = request.form['title']
 
     dec = decrypt_data(request.form['token'].encode('utf-8'))
@@ -329,6 +330,7 @@ def save_file(filename):
     data = {
         "$class": "org.example.Document",
         "fileName": file_name,
+        "fileTitle": file_title,
         "fileChecksum": md5_checksum,
         "fileData": file_data,
         "signatureFile": "null",
@@ -446,7 +448,7 @@ def request_signature(filename):
         }
 
         datass = {"$class": "org.example.Document", "fileName": filename, "fileChecksum": datas['fileChecksum'],
-                  "fileData": datas['fileData'],
+                  "fileData": datas['fileData'], "fileTitle": datas['fileTitle'],
                   "signatureFile": sign_name, "owner": 'resource:org.example.User#' + user['email']}
 
         response = requests.put('http://35.226.165.155:3000/api/Document/' + filename, headers=headers,
